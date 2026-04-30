@@ -34,9 +34,11 @@ const GEMSTONE_CATEGORIES = {
 // State
 let currentMode = "single";
 let isProcessing = false;
+let gemCursorState = null;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
+  initializeGemCursor();
   initializeEventListeners();
   checkAPIStatus();
   // loadSupportedClasses(); // Removed - no longer displayed on UI
@@ -176,6 +178,96 @@ function switchMode(e) {
     batchMode.classList.add("active");
     batchMode.style.display = "block";
   }
+}
+
+function initializeGemCursor() {
+  if (!window.matchMedia("(pointer: fine)").matches) return;
+
+  document.body.classList.add("cursor-active");
+
+  const cursor = document.createElement("div");
+  cursor.className = "gem-cursor";
+  document.body.appendChild(cursor);
+
+  const ring = document.createElement("div");
+  ring.className = "gem-cursor-ring";
+  document.body.appendChild(ring);
+
+  gemCursorState = {
+    cursor,
+    ring,
+    pointerX: window.innerWidth / 2,
+    pointerY: window.innerHeight / 2,
+    currentX: window.innerWidth / 2,
+    currentY: window.innerHeight / 2,
+    ringX: window.innerWidth / 2,
+    ringY: window.innerHeight / 2,
+    visible: false,
+  };
+
+  const hoverTargets = "a, button, label, input, .upload-area, .batch-upload-area, .mode-btn, .result-card, .icon-button";
+
+  document.addEventListener("mousemove", (event) => {
+    gemCursorState.pointerX = event.clientX;
+    gemCursorState.pointerY = event.clientY;
+    if (!gemCursorState.visible) {
+      gemCursorState.visible = true;
+      gemCursorState.cursor.style.opacity = "1";
+      gemCursorState.ring.style.opacity = "1";
+    }
+  });
+
+  document.addEventListener("mousedown", () => {
+    gemCursorState.cursor.classList.add("is-pressed");
+    gemCursorState.ring.classList.add("is-pressed");
+  });
+
+  document.addEventListener("mouseup", () => {
+    gemCursorState.cursor.classList.remove("is-pressed");
+    gemCursorState.ring.classList.remove("is-pressed");
+  });
+
+  document.addEventListener("mouseover", (event) => {
+    const interactive = event.target.closest(hoverTargets);
+    gemCursorState.cursor.classList.toggle("is-hover", Boolean(interactive));
+    gemCursorState.ring.classList.toggle("is-hover", Boolean(interactive));
+  });
+
+  document.addEventListener("mouseleave", () => {
+    gemCursorState.visible = false;
+    gemCursorState.cursor.style.opacity = "0";
+    gemCursorState.ring.style.opacity = "0";
+  });
+
+  const animateCursor = () => {
+    if (!gemCursorState) return;
+
+    gemCursorState.currentX +=
+      (gemCursorState.pointerX - gemCursorState.currentX) * 0.34;
+    gemCursorState.currentY +=
+      (gemCursorState.pointerY - gemCursorState.currentY) * 0.34;
+    gemCursorState.ringX +=
+      (gemCursorState.pointerX - gemCursorState.ringX) * 0.18;
+    gemCursorState.ringY +=
+      (gemCursorState.pointerY - gemCursorState.ringY) * 0.18;
+
+    const cursorScale = gemCursorState.cursor.classList.contains("is-pressed")
+      ? 0.9
+      : gemCursorState.cursor.classList.contains("is-hover")
+        ? 1.08
+        : 1;
+    const ringScale = gemCursorState.ring.classList.contains("is-pressed")
+      ? 0.92
+      : gemCursorState.ring.classList.contains("is-hover")
+        ? 1.18
+        : 1;
+    gemCursorState.cursor.style.transform = `translate3d(${gemCursorState.currentX}px, ${gemCursorState.currentY}px, 0) scale(${cursorScale})`;
+    gemCursorState.ring.style.transform = `translate3d(${gemCursorState.ringX}px, ${gemCursorState.ringY}px, 0) scale(${ringScale})`;
+
+    requestAnimationFrame(animateCursor);
+  };
+
+  requestAnimationFrame(animateCursor);
 }
 
 // Drag and Drop
