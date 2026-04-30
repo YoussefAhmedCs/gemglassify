@@ -1,5 +1,6 @@
 // Configuration
-const API_URL = "http://localhost:8000";
+// Use current domain dynamically so it works both locally and on deployment server
+const API_URL = window.location.origin;
 const GEMSTONE_EMOJIS = {
   Emerald: "💚",
   Fake_Emerald: "🟢",
