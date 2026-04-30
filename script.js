@@ -179,12 +179,17 @@ function switchMode(e) {
   // Update sections
   document.querySelectorAll(".mode-section").forEach((section) => {
     section.classList.remove("active");
+    section.style.display = "none";
   });
 
   if (newMode === "single") {
-    document.getElementById("singleMode").classList.add("active");
+    const singleMode = document.getElementById("singleMode");
+    singleMode.classList.add("active");
+    singleMode.style.display = "block";
   } else {
-    document.getElementById("batchMode").classList.add("active");
+    const batchMode = document.getElementById("batchMode");
+    batchMode.classList.add("active");
+    batchMode.style.display = "block";
   }
 }
 

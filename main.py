@@ -157,50 +157,58 @@ async def startup_event():
     print("⏳ TensorFlow and model will be loaded on first request")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    """Serve index.html (landing page) at root URL"""
+def serve_html_file(file_name: str, fallback: str):
     try:
-        with open("index.html", "r") as f:
+        with open(file_name, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return "<h1>Welcome to CNN Image Classification API</h1><p>index.html not found</p>"
+        return fallback
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/landing.html", response_class=HTMLResponse)
+async def root():
+    """Serve the landing page."""
+    return serve_html_file(
+        "index.html",
+        "<h1>Welcome to CNN Image Classification API</h1><p>index.html not found</p>",
+    )
 
 
 @app.get("/predict", response_class=HTMLResponse)
+@app.get("/predict.html", response_class=HTMLResponse)
 async def predict_page():
     """Serve predict.html"""
-    try:
-        with open("predict.html", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "<h1>Prediction Page</h1><p>predict.html not found</p>"
+    return serve_html_file(
+        "predict.html",
+        "<h1>Prediction Page</h1><p>predict.html not found</p>",
+    )
 
 
 @app.get("/script.js")
 async def serve_script():
     """Serve script.js"""
-    try:
-        with open("script.js", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "console.error('script.js not found on server')"
+    if os.path.exists("script.js"):
+        return FileResponse("script.js", media_type="application/javascript")
+    return HTMLResponse(
+        "console.error('script.js not found on server')",
+        status_code=404,
+        media_type="application/javascript",
+    )
 
 
 @app.get("/static/{file_path:path}")
 async def serve_static(file_path: str):
     """Serve static files"""
-    try:
-        with open(file_path, "r") as f:
-            content = f.read()
-            if file_path.endswith(".js"):
-                return content
-            elif file_path.endswith(".css"):
-                return content
-            else:
-                return content
-    except FileNotFoundError:
-        return {"error": "File not found"}
+    if not os.path.exists(file_path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+
+    if file_path.endswith(".js"):
+        return FileResponse(file_path, media_type="application/javascript")
+    if file_path.endswith(".css"):
+        return FileResponse(file_path, media_type="text/css")
+    return FileResponse(file_path)
 
 
 @app.get("/api")
