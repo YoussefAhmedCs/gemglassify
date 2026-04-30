@@ -13,6 +13,7 @@ model = None
 tf = None
 keras = None
 layers = None
+model_warmed = False
 
 
 def load_tensorflow():
@@ -133,6 +134,17 @@ def load_model():
     return model
 
 
+def warmup_model():
+    """Run one dummy prediction so the first real request is faster."""
+    global model_warmed
+    if model is None or model_warmed:
+        return
+
+    dummy_input = np.zeros((1, IMG_SIZE[0], IMG_SIZE[1], 3), dtype=np.uint8)
+    model.predict(dummy_input, verbose=0)
+    model_warmed = True
+
+
 def preprocess_image(image_data: bytes):
     """Preprocess image for model prediction"""
     # Open image
@@ -152,9 +164,15 @@ def preprocess_image(image_data: bytes):
 
 @app.on_event("startup")
 async def startup_event():
-    """Startup event - minimal initialization"""
+    """Startup event - preload model to reduce first-request latency."""
     print("API Server starting...")
-    print("TensorFlow and model will be loaded on first request")
+    print("Loading TensorFlow and model at startup...")
+    load_model()
+    if model is not None:
+        warmup_model()
+        print("Model is loaded and warmed up.")
+    else:
+        print("Model could not be loaded at startup.")
 
 
 def serve_html_file(file_name: str, fallback: str):
@@ -275,6 +293,7 @@ async def predict(file: UploadFile = File(...)):
     if model is None:
         print("Loading model on first prediction request...")
         load_model()
+        warmup_model()
 
     if model is None:
         raise HTTPException(
@@ -340,6 +359,7 @@ async def predict_batch(files: list[UploadFile] = File(...)):
     if model is None:
         print("Loading model on first prediction request...")
         load_model()
+        warmup_model()
 
     if model is None:
         raise HTTPException(
