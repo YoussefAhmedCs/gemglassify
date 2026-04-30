@@ -7,6 +7,7 @@ from PIL import Image
 import io
 import os
 from pathlib import Path
+from threading import Lock, Thread
 
 # Global model and TensorFlow (lazy loaded)
 model = None
@@ -14,6 +15,8 @@ tf = None
 keras = None
 layers = None
 model_warmed = False
+model_loading = False
+model_lock = Lock()
 
 
 def load_tensorflow():
@@ -145,6 +148,36 @@ def warmup_model():
     model_warmed = True
 
 
+def ensure_model_ready():
+    """Load and warm the model once, with a lock for concurrent requests."""
+    global model_loading
+
+    if model is not None and model_warmed:
+        return model
+
+    with model_lock:
+        if model is not None and model_warmed:
+            return model
+
+        model_loading = True
+        try:
+            if model is None:
+                print("Loading model...")
+                load_model()
+            if model is not None:
+                warmup_model()
+        finally:
+            model_loading = False
+
+    return model
+
+
+def preload_model_in_background():
+    """Start model loading after startup without blocking health checks."""
+    worker = Thread(target=ensure_model_ready, daemon=True)
+    worker.start()
+
+
 def preprocess_image(image_data: bytes):
     """Preprocess image for model prediction"""
     # Open image
@@ -164,15 +197,10 @@ def preprocess_image(image_data: bytes):
 
 @app.on_event("startup")
 async def startup_event():
-    """Startup event - preload model to reduce first-request latency."""
+    """Startup event - start quickly and warm the model in the background."""
     print("API Server starting...")
-    print("Loading TensorFlow and model at startup...")
-    load_model()
-    if model is not None:
-        warmup_model()
-        print("Model is loaded and warmed up.")
-    else:
-        print("Model could not be loaded at startup.")
+    print("Scheduling model warmup in the background...")
+    preload_model_in_background()
 
 
 def serve_html_file(file_name: str, fallback: str):
@@ -267,7 +295,18 @@ async def api_info():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "model_loaded": model is not None}
+    return {
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "model_loading": model_loading,
+    }
+
+
+@app.get("/kaithhealthcheck")
+@app.get("/kaithheathcheck")
+async def platform_health_check():
+    """Compatibility endpoints for Leapcell health probes."""
+    return {"status": "ok"}
 
 
 @app.get("/classes")
@@ -289,11 +328,8 @@ async def predict(file: UploadFile = File(...)):
     """
     global model
 
-    # Lazy load model on first request
-    if model is None:
-        print("Loading model on first prediction request...")
-        load_model()
-        warmup_model()
+    if model is None or not model_warmed:
+        ensure_model_ready()
 
     if model is None:
         raise HTTPException(
@@ -355,11 +391,8 @@ async def predict_batch(files: list[UploadFile] = File(...)):
     """
     global model
 
-    # Lazy load model on first request
-    if model is None:
-        print("Loading model on first prediction request...")
-        load_model()
-        warmup_model()
+    if model is None or not model_warmed:
+        ensure_model_ready()
 
     if model is None:
         raise HTTPException(
