@@ -153,8 +153,8 @@ def preprocess_image(image_data: bytes):
 @app.on_event("startup")
 async def startup_event():
     """Startup event - minimal initialization"""
-    print("🚀 API Server starting...")
-    print("⏳ TensorFlow and model will be loaded on first request")
+    print("API Server starting...")
+    print("TensorFlow and model will be loaded on first request")
 
 
 def serve_html_file(file_name: str, fallback: str):
@@ -208,6 +208,15 @@ async def serve_styles():
         status_code=404,
         media_type="text/css",
     )
+
+
+@app.get("/Downlode-test-images/{file_path:path}")
+async def serve_demo_images(file_path: str):
+    """Serve demo images used by the landing page."""
+    image_path = Path("Downlode-test-images") / file_path
+    if not image_path.exists() or not image_path.is_file():
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    return FileResponse(image_path)
 
 
 @app.get("/static/{file_path:path}")
